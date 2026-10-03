@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Dodge Auto Tap</string>
+    <string name="accessibility_description">Finds the Dodge text on screen and taps it when enabled.</string>
+</resources>
