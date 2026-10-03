@@ -7,6 +7,8 @@ import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.MotionEvent
@@ -30,48 +32,92 @@ class DodgeAccessibilityService : AccessibilityService() {
 
     private var floatingButton: TextView? = null
     private var panel: LinearLayout? = null
-
     private var buttonParams: WindowManager.LayoutParams? = null
+
+    private val handler = Handler(Looper.getMainLooper())
+
+    private val autoTapRunnable = object : Runnable {
+        override fun run() {
+            if (enabled) {
+                tryFindAndTapDodge()
+            }
+
+            handler.postDelayed(this, 100)
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
 
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        windowManager =
+            getSystemService(WINDOW_SERVICE) as WindowManager
 
         showFloatingButton()
+
+        handler.removeCallbacks(autoTapRunnable)
+        handler.post(autoTapRunnable)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (!enabled) return
+        if (enabled) {
+            tryFindAndTapDodge()
+        }
+    }
+
+    private fun tryFindAndTapDodge() {
 
         val now = SystemClock.uptimeMillis()
 
-        if (now - lastTap < 180) return
+        if (now - lastTap < 180)
+            return
 
         val root = rootInActiveWindow ?: return
+
         val node = findDodge(root) ?: return
 
-        val r = Rect()
-        node.getBoundsInScreen(r)
+        val rect = Rect()
+        node.getBoundsInScreen(rect)
 
-        if (r.width() <= 0 || r.height() <= 0) return
+        if (rect.width() <= 0 || rect.height() <= 0)
+            return
 
-        val x = r.centerX().toFloat()
-        val y = r.centerY().toFloat()
+        /*
+         * Önce normal Accessibility click deniyoruz.
+         */
+        if (node.isClickable) {
+
+            val clicked =
+                node.performAction(
+                    AccessibilityNodeInfo.ACTION_CLICK
+                )
+
+            if (clicked) {
+                lastTap = now
+                return
+            }
+        }
+
+        /*
+         * ACTION_CLICK çalışmazsa koordinata
+         * gesture gönderiyoruz.
+         */
+        val x = rect.centerX().toFloat()
+        val y = rect.centerY().toFloat()
 
         val path = Path().apply {
             moveTo(x, y)
         }
 
-        val gesture = GestureDescription.Builder()
-            .addStroke(
-                GestureDescription.StrokeDescription(
-                    path,
-                    0,
-                    40
+        val gesture =
+            GestureDescription.Builder()
+                .addStroke(
+                    GestureDescription.StrokeDescription(
+                        path,
+                        0,
+                        40
+                    )
                 )
-            )
-            .build()
+                .build()
 
         lastTap = now
 
@@ -130,7 +176,10 @@ class DodgeAccessibilityService : AccessibilityService() {
             GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.rgb(35, 120, 255))
-                setStroke(3, Color.rgb(100, 180, 255))
+                setStroke(
+                    3,
+                    Color.rgb(100, 180, 255)
+                )
             }
 
         button.elevation = 20f
@@ -146,7 +195,9 @@ class DodgeAccessibilityService : AccessibilityService() {
                 PixelFormat.TRANSLUCENT
             )
 
-        params.gravity = Gravity.TOP or Gravity.START
+        params.gravity =
+            Gravity.TOP or Gravity.START
+
         params.x = dp(20)
         params.y = dp(180)
 
@@ -172,7 +223,9 @@ class DodgeAccessibilityService : AccessibilityService() {
             .scaleY(1f)
             .alpha(1f)
             .setDuration(350)
-            .setInterpolator(DecelerateInterpolator())
+            .setInterpolator(
+                DecelerateInterpolator()
+            )
             .start()
     }
 
@@ -266,10 +319,9 @@ class DodgeAccessibilityService : AccessibilityService() {
 
         if (panel != null) {
             hidePanel()
-            return
+        } else {
+            showPanel()
         }
-
-        showPanel()
     }
 
     private fun showPanel() {
@@ -291,11 +343,7 @@ class DodgeAccessibilityService : AccessibilityService() {
                     GradientDrawable().apply {
 
                         setColor(
-                            Color.rgb(
-                                18,
-                                21,
-                                29
-                            )
+                            Color.rgb(18, 21, 29)
                         )
 
                         cornerRadius =
@@ -303,11 +351,7 @@ class DodgeAccessibilityService : AccessibilityService() {
 
                         setStroke(
                             dp(1),
-                            Color.rgb(
-                                65,
-                                140,
-                                255
-                            )
+                            Color.rgb(65, 140, 255)
                         )
                     }
 
@@ -321,7 +365,10 @@ class DodgeAccessibilityService : AccessibilityService() {
                     "⚡ Dodge Auto Tap"
 
                 textSize = 18f
-                setTextColor(Color.WHITE)
+
+                setTextColor(
+                    Color.WHITE
+                )
 
                 setPadding(
                     0,
@@ -394,8 +441,7 @@ class DodgeAccessibilityService : AccessibilityService() {
 
                     startActivity(
                         android.content.Intent(
-                            android.provider.Settings
-                                .ACTION_ACCESSIBILITY_SETTINGS
+                            android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS
                         )
                     )
                 }
@@ -426,8 +472,7 @@ class DodgeAccessibilityService : AccessibilityService() {
                 PixelFormat.TRANSLUCENT
             )
 
-        params.gravity =
-            Gravity.CENTER
+        params.gravity = Gravity.CENTER
 
         panel = root
 
@@ -474,6 +519,10 @@ class DodgeAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
 
+        handler.removeCallbacks(
+            autoTapRunnable
+        )
+
         try {
             panel?.let {
                 windowManager.removeView(it)
@@ -494,8 +543,7 @@ class DodgeAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
-    override fun onInterrupt() {
-    }
+    override fun onInterrupt() {}
 
     private fun dp(value: Int): Int {
         return (
