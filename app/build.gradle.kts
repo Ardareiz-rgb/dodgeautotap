@@ -4,6 +4,15 @@ plugins {
 }
 
 android {
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
     namespace = "com.example.dodgeautotap"
     compileSdk = 35
 
