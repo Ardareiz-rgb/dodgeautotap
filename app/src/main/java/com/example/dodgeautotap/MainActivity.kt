@@ -4,51 +4,108 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.Switch
 import android.widget.TextView
 
 class MainActivity : Activity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 60, 40, 40)
+        val root = LinearLayout(this).apply {
+
+            orientation =
+                LinearLayout.VERTICAL
+
+            gravity = Gravity.CENTER_HORIZONTAL
+
+            setPadding(
+                35,
+                60,
+                35,
+                40
+            )
+
+            setBackgroundColor(
+                Color.rgb(9, 11, 16)
+            )
         }
 
-        val title = TextView(this).apply {
-            text = "Dodge Auto Tap"
-            textSize = 28f
-        }
+        val title =
+            TextView(this).apply {
 
-        val info = TextView(this).apply {
-            text = "\n1. Accessibility Service'i aç.\n2. Oyuna dön.\n3. Dodge düğmesi görünürken otomatik dokunmayı kullan.\n"
-            textSize = 16f
-        }
+                text = "⚡ Dodge Auto Tap"
 
-        val openSettings = TextView(this).apply {
-            text = "♿ Erişilebilirlik ayarlarını aç"
-            textSize = 18f
-            setPadding(0, 30, 0, 30)
-            setOnClickListener {
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                textSize = 30f
+
+                setTextColor(
+                    Color.WHITE
+                )
+
+                gravity = Gravity.CENTER
+
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    20
+                )
             }
-        }
 
-        val toggle = Switch(this).apply {
-            text = "Dodge Auto Tap"
-            textSize = 18f
-            isChecked = DodgeAccessibilityService.enabled
-            setOnCheckedChangeListener { _, checked ->
-                DodgeAccessibilityService.enabled = checked
+        val info =
+            TextView(this).apply {
+
+                text =
+                    "Uygulama hazır.\n\n" +
+                    "Önce Erişilebilirlik servisini aç.\n" +
+                    "Servis açıldıktan sonra ekranda " +
+                    "sürüklenebilir D düğmesi görünecek.\n\n" +
+                    "Auto Tap başlangıçta KAPALI'dır."
+
+                textSize = 16f
+
+                setTextColor(
+                    Color.rgb(
+                        185,
+                        190,
+                        205
+                    )
+                )
+
+                gravity = Gravity.CENTER
+
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    30
+                )
             }
-        }
 
-        layout.addView(title)
-        layout.addView(info)
-        layout.addView(openSettings)
-        layout.addView(toggle)
-        setContentView(layout)
+        val settings =
+            Button(this).apply {
+
+                text =
+                    "♿ Erişilebilirlik Ayarlarını Aç"
+
+                setOnClickListener {
+
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_ACCESSIBILITY_SETTINGS
+                        )
+                    )
+                }
+            }
+
+        root.addView(title)
+        root.addView(info)
+        root.addView(settings)
+
+        setContentView(root)
     }
 }
