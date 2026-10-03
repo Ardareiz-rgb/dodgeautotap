@@ -12,19 +12,18 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.text.InputType
 import kotlin.math.abs
 
 class DodgeAccessibilityService : AccessibilityService() {
 
     companion object {
-        @Volatile
-        var enabled = false
-
-        @Volatile
-        var interval = 300L
+        @Volatile var enabled = false
     }
 
     private lateinit var windowManager: WindowManager
@@ -33,17 +32,17 @@ class DodgeAccessibilityService : AccessibilityService() {
     private var floatingButton: TextView? = null
     private var panel: LinearLayout? = null
 
-    private val targets = mutableListOf<Target>()
-
     private var currentTarget = 0
-
     private var running = false
 
-    data class Target(
+    private data class Target(
         var x: Float,
         var y: Float,
-        var view: TextView
+        var interval: Long,
+        val view: TextView
     )
+
+    private val targets = mutableListOf<Target>()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -54,25 +53,27 @@ class DodgeAccessibilityService : AccessibilityService() {
         showFloatingButton()
     }
 
-    override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {}
+    override fun onAccessibilityEvent(
+        event: AccessibilityEvent?
+    ) {
+    }
 
     private fun startAutoClick() {
-
-        if (running)
-            return
+        if (running || targets.isEmpty()) return
 
         running = true
+        currentTarget = 0
         clickNext()
     }
 
     private fun stopAutoClick() {
         running = false
+        handler.removeCallbacksAndMessages(null)
     }
 
     private fun clickNext() {
 
-        if (!running || !enabled)
-            return
+        if (!running || !enabled) return
 
         if (targets.isEmpty()) {
             running = false
@@ -84,10 +85,7 @@ class DodgeAccessibilityService : AccessibilityService() {
 
         val target = targets[currentTarget]
 
-        clickAt(
-            target.x,
-            target.y
-        )
+        clickAt(target.x, target.y)
 
         currentTarget++
 
@@ -95,7 +93,7 @@ class DodgeAccessibilityService : AccessibilityService() {
             {
                 clickNext()
             },
-            interval
+            target.interval.coerceAtLeast(20L)
         )
     }
 
@@ -104,9 +102,9 @@ class DodgeAccessibilityService : AccessibilityService() {
         y: Float
     ) {
 
-        val path = Path()
-
-        path.moveTo(x, y)
+        val path = Path().apply {
+            moveTo(x, y)
+        }
 
         val gesture =
             GestureDescription.Builder()
@@ -114,7 +112,7 @@ class DodgeAccessibilityService : AccessibilityService() {
                     GestureDescription.StrokeDescription(
                         path,
                         0,
-                        40
+                        10
                     )
                 )
                 .build()
@@ -128,26 +126,24 @@ class DodgeAccessibilityService : AccessibilityService() {
 
     private fun showFloatingButton() {
 
-        if (floatingButton != null)
-            return
+        if (floatingButton != null) return
 
-        val button =
-            TextView(this)
+        val button = TextView(this).apply {
+            text = "▶"
+            textSize = 22f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
 
-        button.text = "▶"
-        button.textSize = 22f
-        button.setTextColor(Color.WHITE)
-        button.gravity = Gravity.CENTER
-
-        button.background =
-            GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.rgb(35, 120, 255))
-                setStroke(
-                    3,
-                    Color.rgb(100, 180, 255)
-                )
-            }
+            background =
+                GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.rgb(35, 120, 255))
+                    setStroke(
+                        3,
+                        Color.rgb(100, 180, 255)
+                    )
+                }
+        }
 
         val size = dp(58)
 
@@ -179,16 +175,13 @@ class DodgeAccessibilityService : AccessibilityService() {
     }
 
     private inner class FloatingTouchListener(
-        private val params:
-            WindowManager.LayoutParams
+        private val params: WindowManager.LayoutParams
     ) : View.OnTouchListener {
 
         private var downX = 0f
         private var downY = 0f
-
         private var startX = 0
         private var startY = 0
-
         private var moved = false
 
         override fun onTouch(
@@ -252,14 +245,15 @@ class DodgeAccessibilityService : AccessibilityService() {
 
     private fun togglePanel() {
 
-        if (panel != null) {
+        if (panel != null)
             hidePanel()
-        } else {
+        else
             showPanel()
-        }
     }
 
     private fun showPanel() {
+
+        if (panel != null) return
 
         val root =
             LinearLayout(this).apply {
@@ -276,11 +270,9 @@ class DodgeAccessibilityService : AccessibilityService() {
 
                 background =
                     GradientDrawable().apply {
-
                         setColor(
                             Color.rgb(20, 23, 30)
                         )
-
                         cornerRadius =
                             dp(18).toFloat()
                     }
@@ -288,43 +280,30 @@ class DodgeAccessibilityService : AccessibilityService() {
 
         val title =
             TextView(this).apply {
-
-                text =
-                    "⚡ Multi Auto Clicker"
-
+                text = "⚡ Multi Auto Clicker"
                 textSize = 21f
-
-                setTextColor(
-                    Color.WHITE
-                )
+                setTextColor(Color.WHITE)
             }
 
-        val targetCount =
+        val count =
             TextView(this).apply {
-
                 text =
                     "Hedef sayısı: ${targets.size}"
-
                 textSize = 16f
-
-                setTextColor(
-                    Color.LTGRAY
-                )
-
-                tag = "targetCount"
+                setTextColor(Color.LTGRAY)
+                tag = "count"
             }
 
         val add =
             Button(this).apply {
 
-                text =
-                    "🎯 Hedef Ekle"
+                text = "🎯 Hedef Ekle"
 
                 setOnClickListener {
 
                     addTarget()
 
-                    targetCount.text =
+                    count.text =
                         "Hedef sayısı: ${targets.size}"
                 }
             }
@@ -344,53 +323,25 @@ class DodgeAccessibilityService : AccessibilityService() {
 
                     if (enabled) {
                         startAutoClick()
-                        text =
-                            "AUTO CLICK: AÇIK"
+                        text = "AUTO CLICK: AÇIK"
                     } else {
                         stopAutoClick()
-                        text =
-                            "AUTO CLICK: KAPALI"
+                        text = "AUTO CLICK: KAPALI"
                     }
-                }
-            }
-
-        val faster =
-            Button(this).apply {
-
-                text =
-                    "⚡ Daha Hızlı"
-
-                setOnClickListener {
-
-                    interval =
-                        (interval - 50L)
-                            .coerceAtLeast(50L)
-                }
-            }
-
-        val slower =
-            Button(this).apply {
-
-                text =
-                    "🐢 Daha Yavaş"
-
-                setOnClickListener {
-
-                    interval += 50L
                 }
             }
 
         val clear =
             Button(this).apply {
 
-                text =
-                    "🗑️ Hedefleri Temizle"
+                text = "🗑️ Hedefleri Temizle"
 
                 setOnClickListener {
 
+                    stopAutoClick()
                     clearTargets()
 
-                    targetCount.text =
+                    count.text =
                         "Hedef sayısı: 0"
                 }
             }
@@ -398,8 +349,7 @@ class DodgeAccessibilityService : AccessibilityService() {
         val close =
             Button(this).apply {
 
-                text =
-                    "Kapat"
+                text = "Kapat"
 
                 setOnClickListener {
                     hidePanel()
@@ -407,17 +357,15 @@ class DodgeAccessibilityService : AccessibilityService() {
             }
 
         root.addView(title)
-        root.addView(targetCount)
+        root.addView(count)
         root.addView(add)
         root.addView(toggle)
-        root.addView(faster)
-        root.addView(slower)
         root.addView(clear)
         root.addView(close)
 
         val params =
             WindowManager.LayoutParams(
-                dp(280),
+                dp(300),
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
@@ -436,28 +384,35 @@ class DodgeAccessibilityService : AccessibilityService() {
 
     private fun addTarget() {
 
-        val target =
-            TextView(this)
+        val number = targets.size + 1
 
-        target.text = "${targets.size + 1}"
-        target.textSize = 16f
-        target.setTextColor(Color.WHITE)
-        target.gravity = Gravity.CENTER
+        val targetView =
+            TextView(this).apply {
 
-        target.background =
-            GradientDrawable().apply {
+                text = number.toString()
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
 
-                shape =
-                    GradientDrawable.OVAL
+                background =
+                    GradientDrawable().apply {
 
-                setColor(
-                    Color.rgb(255, 70, 70)
-                )
+                        shape =
+                            GradientDrawable.OVAL
 
-                setStroke(
-                    dp(2),
-                    Color.WHITE
-                )
+                        setColor(
+                            Color.rgb(
+                                255,
+                                70,
+                                70
+                            )
+                        )
+
+                        setStroke(
+                            dp(2),
+                            Color.WHITE
+                        )
+                    }
             }
 
         val size = dp(48)
@@ -477,30 +432,147 @@ class DodgeAccessibilityService : AccessibilityService() {
         params.x =
             dp(100 + targets.size * 60)
 
-        params.y =
-            dp(300)
+        params.y = dp(300)
 
-        val targetObject =
+        val target =
             Target(
-                params.x.toFloat() +
-                    size / 2f,
-                params.y.toFloat() +
-                    size / 2f,
-                target
+                params.x + size / 2f,
+                params.y + size / 2f,
+                100L,
+                targetView
             )
 
-        targets.add(targetObject)
+        targets.add(target)
 
-        target.setOnTouchListener(
+        targetView.setOnTouchListener(
             TargetTouchListener(
-                targetObject,
+                target,
                 params,
                 size
             )
         )
 
         windowManager.addView(
-            target,
+            targetView,
+            params
+        )
+
+        showTargetSettings(target)
+    }
+
+    private fun showTargetSettings(
+        target: Target
+    ) {
+
+        val dialog =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    dp(20),
+                    dp(20),
+                    dp(20),
+                    dp(20)
+                )
+
+                background =
+                    GradientDrawable().apply {
+                        setColor(
+                            Color.rgb(
+                                25,
+                                28,
+                                36
+                            )
+                        )
+                        cornerRadius =
+                            dp(16).toFloat()
+                    }
+            }
+
+        val title =
+            TextView(this).apply {
+
+                text =
+                    "🎯 Hedef ${targets.indexOf(target) + 1}"
+
+                textSize = 19f
+                setTextColor(Color.WHITE)
+            }
+
+        val label =
+            TextView(this).apply {
+
+                text =
+                    "Tıklama aralığı (ms)"
+
+                textSize = 15f
+                setTextColor(Color.LTGRAY)
+            }
+
+        val input =
+            EditText(this).apply {
+
+                setText(
+                    target.interval.toString()
+                )
+
+                textSize = 16f
+                setTextColor(Color.WHITE)
+
+                inputType =
+                    InputType.TYPE_CLASS_NUMBER
+            }
+
+        val save =
+            Button(this).apply {
+
+                text = "Kaydet"
+
+                setOnClickListener {
+
+                    val value =
+                        input.text
+                            .toString()
+                            .toLongOrNull()
+
+                    if (value != null) {
+
+                        target.interval =
+                            value.coerceIn(
+                                20L,
+                                60000L
+                            )
+                    }
+
+                    try {
+                        windowManager.removeView(
+                            dialog
+                        )
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+
+        dialog.addView(title)
+        dialog.addView(label)
+        dialog.addView(input)
+        dialog.addView(save)
+
+        val params =
+            WindowManager.LayoutParams(
+                dp(260),
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+            )
+
+        params.gravity = Gravity.CENTER
+
+        windowManager.addView(
+            dialog,
             params
         )
     }
@@ -513,7 +585,6 @@ class DodgeAccessibilityService : AccessibilityService() {
 
         private var downX = 0f
         private var downY = 0f
-
         private var startX = 0
         private var startY = 0
 
@@ -543,19 +614,16 @@ class DodgeAccessibilityService : AccessibilityService() {
                     val dy =
                         (event.rawY - downY).toInt()
 
-                    params.x =
-                        startX + dx
-
-                    params.y =
-                        startY + dy
+                    params.x = startX + dx
+                    params.y = startY + dy
 
                     target.x =
                         params.x +
-                            size / 2f
+                        size / 2f
 
                     target.y =
                         params.y +
-                            size / 2f
+                        size / 2f
 
                     windowManager.updateViewLayout(
                         v,
@@ -566,6 +634,9 @@ class DodgeAccessibilityService : AccessibilityService() {
                 }
 
                 MotionEvent.ACTION_UP -> {
+
+                    showTargetSettings(target)
+
                     return true
                 }
             }
@@ -606,10 +677,6 @@ class DodgeAccessibilityService : AccessibilityService() {
 
         stopAutoClick()
 
-        handler.removeCallbacksAndMessages(
-            null
-        )
-
         clearTargets()
 
         try {
@@ -626,11 +693,9 @@ class DodgeAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    private fun dp(value: Int): Int {
-
-        return (
+    private fun dp(value: Int): Int =
+        (
             value *
-                resources.displayMetrics.density
-            ).toInt()
-    }
+            resources.displayMetrics.density
+        ).toInt()
 }
